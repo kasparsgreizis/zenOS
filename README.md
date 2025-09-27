@@ -1,168 +1,255 @@
-# 🧘 zenOS - The Zen of AI Workflow Orchestration
+# TTS Queue System for Voice Models/Agents
 
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+A robust, thread-safe Text-to-Speech queue system designed to handle high-frequency TTS requests from sources like streamer donation messages, preventing race conditions and ensuring proper audio playback ordering.
 
-**zenOS** is a powerful, modular AI agent orchestration framework that brings zen-like simplicity to complex AI workflows.
+## Features
 
-## ✨ Features
+- **Thread-Safe Operations**: Uses asyncio and threading for concurrent processing
+- **Priority-Based Queue**: Different priority levels for different message types
+- **Audio Overlap Prevention**: Prevents multiple audio streams from playing simultaneously
+- **Rate Limiting**: Configurable rate limiting to prevent system overload
+- **Multiple TTS Engine Support**: Works with pyttsx3, Google TTS, Azure Speech Services
+- **Streamer Bot Integration**: Built-in support for donation, subscription, and chat messages
+- **WebSocket API**: Real-time message handling via WebSocket
+- **Comprehensive Testing**: Full test suite with unit and integration tests
 
-- 🚀 **Simple CLI**: One command to rule them all - `zen`
-- 📱 **Mobile-First**: Native Termux support with voice & gesture integration
-- 🌉 **Bridge System**: Seamless airi-zenOS integration for mobile AI
-- 🎤 **Voice Interface**: Voice input/output with Termux API
-- 🔋 **Offline Mode**: Local AI processing with Ollama integration
-- 🤖 **Modular Agents**: Composable, reusable AI agents
-- 🔒 **Security First**: Built-in defense against prompt injection
-- 🎯 **Auto-Critique**: Every prompt automatically upgraded for better results
-- 🔋 **Battery-Aware**: Automatic eco mode for mobile devices
-- 📦 **Zero Config**: Works out of the box, extensible when needed
-- 🌈 **Beautiful Output**: Rich terminal interface with progress indicators
-- 💾 **Smart Caching**: Offline access to previous AI responses
+## Quick Start
 
-## 🚀 Quick Start
-
-### **One-Command Setup (All Platforms)** ⚡
+### Installation
 
 ```bash
-# Clone and setup in one command - works everywhere!
-git clone https://github.com/kasparsgreizis/zenOS.git && cd zenOS && python setup.py
+pip install -r requirements.txt
 ```
-
-### **Platform-Specific One-Liners**
-
-**🖥️ Windows (PowerShell)**
-```powershell
-git clone https://github.com/kasparsgreizis/zenOS.git; cd zenOS; python setup.py
-```
-
-**🐧 Linux/macOS**
-```bash
-git clone https://github.com/kasparsgreizis/zenOS.git && cd zenOS && python setup.py
-```
-
-**📱 Mobile (Termux)**
-```bash
-git clone https://github.com/kasparsgreizis/zenOS.git && cd zenOS && python setup.py
-```
-
-### **Legacy Installers (Still Available)**
-
-**📱 Mobile (Android/Termux)**
-```bash
-curl -sSL https://raw.githubusercontent.com/kasparsgreizis/zenOS/main/install.sh | bash
-```
-
-**🖥️ Windows (PowerShell)**
-```powershell
-iwr -useb https://raw.githubusercontent.com/kasparsgreizis/zenOS/main/install.ps1 | iex
-```
-
-**🐧 Linux/macOS**
-```bash
-curl -sSL https://raw.githubusercontent.com/kasparsgreizis/zenOS/main/install.sh | bash
-```
-
-### Detailed Guides
-
-🚀 **[Dev Environment Setup](docs/guides/DEV_ENVIRONMENT_SETUP.md)** - **Your anchor point for all dev setups**  
-📱 **[Full Mobile Guide](docs/guides/QUICKSTART_MOBILE.md)** - Complete Termux setup  
-🖥️ **[Full Windows Guide](docs/guides/QUICKSTART_WINDOWS.md)** - PowerShell installation  
-🐧 **[Full Linux Guide](docs/guides/QUICKSTART_LINUX.md)** - Terminal installation  
-🚀 **[Setup Guide](docs/guides/SETUP_GUIDE.md)** - Unified setup system documentation
-
-### Quick Reference
-
-📋 **[Dev Setup Cheat Sheet](DEV_SETUP_CHEAT_SHEET.md)** - One-page reference for all platforms
 
 ### Basic Usage
 
+```python
+import asyncio
+from tts_queue_system import TTSQueueManager, TTSConfig, MessagePriority
+
+async def main():
+    # Create configuration
+    config = TTSConfig(
+        max_queue_size=1000,
+        max_concurrent_workers=3,
+        rate_limit_per_minute=60
+    )
+    
+    # Create TTS manager
+    tts_manager = TTSQueueManager(config)
+    
+    # Set up TTS engine (example with pyttsx3)
+    import pyttsx3
+    engine = pyttsx3.init()
+    
+    async def tts_engine(text: str, **kwargs) -> bytes:
+        # Your TTS implementation here
+        return b"audio_data"
+    
+    tts_manager.set_tts_engine(tts_engine)
+    
+    # Start the system
+    await tts_manager.start()
+    
+    # Add messages
+    tts_manager.add_message("Hello world!", MessagePriority.NORMAL)
+    tts_manager.add_message("Urgent message!", MessagePriority.URGENT)
+    
+    # Wait for processing
+    await asyncio.sleep(5)
+    
+    # Stop the system
+    await tts_manager.stop()
+
+asyncio.run(main())
+```
+
+## Architecture
+
+### Core Components
+
+1. **TTSQueueManager**: Main orchestrator that manages the queue and workers
+2. **TTSWorker**: Individual worker threads that process TTS requests
+3. **AudioManager**: Handles audio playback scheduling and overlap prevention
+4. **RateLimiter**: Implements rate limiting to prevent system overload
+5. **TTSMessage**: Data structure representing a TTS request
+
+### Priority System
+
+Messages are processed based on priority levels:
+
+- **URGENT**: High-value donations ($100+), critical alerts
+- **HIGH**: Regular donations, subscriptions, follows, raids
+- **NORMAL**: Commands, general alerts
+- **LOW**: Regular chat messages (if enabled)
+
+### Race Condition Prevention
+
+The system prevents race conditions through:
+
+1. **Thread-Safe Queues**: Using Python's `queue.PriorityQueue`
+2. **Audio Overlap Detection**: Prevents multiple audio streams
+3. **Atomic Operations**: All queue operations are atomic
+4. **Worker Synchronization**: Coordinated worker management
+
+## Streamer Bot Integration
+
+The system includes built-in support for common streamer bot scenarios:
+
+```python
+from tts_integration_example import StreamerBotIntegration
+
+# Create streamer bot
+streamer_bot = StreamerBotIntegration(tts_manager)
+
+# Process different types of events
+streamer_bot.process_donation("VIP_User", 150.0, "Keep up the great work!")
+streamer_bot.process_subscription("NewSub", 1, "First time subscribing!")
+streamer_bot.process_follow("NewFollower")
+streamer_bot.process_chat_message("Moderator", "!tts Welcome everyone!", is_mod=True)
+```
+
+## TTS Engine Integration
+
+### pyttsx3 (Offline, Fast)
+
+```python
+from tts_integration_example import Pyttsx3TTSEngine
+
+engine = Pyttsx3TTSEngine(voice_id="english", rate=200)
+tts_manager.set_tts_engine(engine.generate_audio)
+```
+
+### Google Text-to-Speech (Online, High Quality)
+
+```python
+from tts_integration_example import GTTS_Engine
+
+engine = GTTS_Engine(language='en', tld='com')
+tts_manager.set_tts_engine(engine.generate_audio)
+```
+
+### Azure Speech Services (Enterprise)
+
+```python
+from tts_integration_example import AzureTTS_Engine
+
+engine = AzureTTS_Engine(
+    subscription_key="your_key",
+    region="your_region",
+    voice_name="en-US-AriaNeural"
+)
+tts_manager.set_tts_engine(engine.generate_audio)
+```
+
+## WebSocket API
+
+Start a WebSocket server for real-time message handling:
+
+```python
+from tts_integration_example import WebSocketServer
+
+# Create WebSocket server
+server = WebSocketServer(streamer_bot, host="localhost", port=8765)
+
+# Start server
+await server.start_server()
+```
+
+### WebSocket Message Format
+
+```json
+{
+  "type": "donation",
+  "donor_name": "JohnDoe",
+  "amount": 25.0,
+  "message": "Great stream!"
+}
+```
+
+## Configuration
+
+The system can be configured via JSON:
+
+```json
+{
+  "tts_queue": {
+    "max_queue_size": 1000,
+    "max_concurrent_workers": 3,
+    "rate_limit_per_minute": 60,
+    "enable_priority_queue": true
+  },
+  "streamer_bot": {
+    "priorities": {
+      "donation": "URGENT",
+      "subscription": "HIGH",
+      "chat": "LOW"
+    }
+  }
+}
+```
+
+## Testing
+
+Run the test suite:
+
 ```bash
-# Run an agent
-zen troubleshoot "fix my git commit issue"
-
-# Mobile voice input (Termux)
-zen-voice "explain quantum computing"
-
-# Mobile clipboard input
-zen-clip  # Processes clipboard content
-
-# airi integration (mobile)
-zen airi "enhanced mobile processing"
-
-# Offline mode (local AI)
-zen offline "work without internet"
-
-# Bridge system (airi + zenOS)
-zen interactive  # Full bridge mode
-
-# Review a prompt
-zen critic "analyze this prompt for improvements"
-
-# List available agents
-zen --list
-
-# Create a new agent
-zen --create my-agent
-
-# Disable auto-critique for speed
-zen --no-critique assistant "quick question"
-
-# Battery-aware mode (auto on mobile)
-zen --eco "run in low power mode"
+pytest test_tts_queue_system.py -v
 ```
 
-## 🏗️ Architecture
+## Performance Considerations
 
-zenOS is built on a modular architecture that separates concerns:
+### Queue Size
+- Set `max_queue_size` based on expected peak load
+- Monitor queue size via `get_stats()`
 
+### Worker Count
+- More workers = higher throughput but more resource usage
+- Recommended: 2-4 workers for most use cases
+
+### Rate Limiting
+- Prevents overwhelming TTS engines
+- Adjust `rate_limit_per_minute` based on TTS engine capabilities
+
+### Memory Usage
+- Each queued message consumes memory
+- Consider implementing message persistence for very high loads
+
+## Error Handling
+
+The system includes comprehensive error handling:
+
+- **Queue Full**: Raises `RuntimeError` when queue is full
+- **TTS Engine Errors**: Retries failed messages up to `max_retries`
+- **Audio Playback Errors**: Graceful fallback and logging
+- **Worker Errors**: Automatic worker recovery
+
+## Monitoring
+
+Get real-time statistics:
+
+```python
+stats = tts_manager.get_stats()
+print(f"Queue size: {stats['queue_size']}")
+print(f"Processed: {stats['total_processed']}")
+print(f"Failed: {stats['total_failed']}")
+print(f"Active workers: {stats['active_workers']}")
 ```
-zenOS/
-├── zen/                    # Core package
-│   ├── cli.py             # CLI interface
-│   ├── core/              # Core functionality
-│   ├── agents/            # Built-in agents
-│   └── utils/             # Utilities
-├── agents/                # User-defined agents
-├── modules/               # Modular components
-│   ├── roles/            # Who you are
-│   ├── tasks/            # What you do
-│   ├── contexts/         # Where/why you operate
-│   └── constraints/      # Rules and limits
-└── configs/              # Configuration
-```
 
-## 🤖 Built-in Agents
+## License
 
-- **troubleshooter**: System diagnostics and automated fixes
-- **critic**: Prompt analysis and improvement
-- **security**: Security analysis and threat detection
-- **assistant**: General-purpose AI assistant
-- More coming soon...
+MIT License - see LICENSE file for details.
 
-## 📚 Documentation
+## Contributing
 
-- [Quick Start Guide](docs/guides/QUICKSTART.md)
-- [Mobile Setup (Termux)](docs/guides/QUICKSTART_MOBILE.md)
-- [Windows Setup](docs/guides/QUICKSTART_WINDOWS.md)
-- [Linux Setup](docs/guides/QUICKSTART_LINUX.md)
-- [AI Integration Blueprint](docs/planning/AI_INTEGRATION_BLUEPRINT.md)
-- [Plugin System](docs/planning/PLUGIN_SYSTEM_SPECIFICATION.md)
-- [Mobile UI Framework](docs/planning/MOBILE_UI_FRAMEWORK.md)
+1. Fork the repository
+2. Create a feature branch
+3. Add tests for new functionality
+4. Submit a pull request
 
-## 🤝 Contributing
+## Support
 
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-## 📄 License
-
-zenOS is MIT licensed. See [LICENSE](LICENSE) for details.
-
-## 🙏 Acknowledgments
-
-zenOS is the evolution of PromptOS, rebuilt from the ground up with a focus on simplicity, security, and developer experience.
-
----
-
-**"The path to AI enlightenment begins with a single command: `zen`"** 🧘
+For issues and questions:
+- Create an issue on GitHub
+- Check the documentation
+- Review the test cases for usage examples

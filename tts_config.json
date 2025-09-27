@@ -1,0 +1,47 @@
+{
+  "tts_queue": {
+    "max_queue_size": 1000,
+    "max_concurrent_workers": 3,
+    "audio_overlap_threshold": 0.1,
+    "rate_limit_per_minute": 60,
+    "enable_priority_queue": true,
+    "enable_rate_limiting": true,
+    "log_level": "INFO"
+  },
+  "tts_engine": {
+    "type": "pyttsx3",
+    "voice_id": null,
+    "rate": 200,
+    "volume": 0.9,
+    "language": "en",
+    "tld": "com"
+  },
+  "audio": {
+    "format": "wav",
+    "sample_rate": 22050,
+    "channels": 1
+  },
+  "streamer_bot": {
+    "priorities": {
+      "donation": "URGENT",
+      "subscription": "HIGH",
+      "follow": "HIGH",
+      "raid": "HIGH",
+      "host": "HIGH",
+      "alert": "NORMAL",
+      "chat": "LOW",
+      "command": "NORMAL"
+    },
+    "donation_thresholds": {
+      "urgent": 100,
+      "high": 50,
+      "normal": 1
+    },
+    "chat_keywords": ["!tts", "!say", "!announce"]
+  },
+  "websocket": {
+    "host": "localhost",
+    "port": 8765,
+    "enabled": true
+  }
+}

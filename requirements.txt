@@ -1,0 +1,28 @@
+# Core dependencies
+asyncio
+threading
+queue
+dataclasses
+enum34; python_version < '3.4'
+
+# Optional TTS engines
+pyttsx3>=2.90
+gtts>=2.3.0
+pygame>=2.1.0
+
+# Azure Speech Services (optional)
+azure-cognitiveservices-speech>=1.19.0
+
+# WebSocket support
+websockets>=10.0
+
+# Testing
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+
+# Audio processing (optional)
+pydub>=0.25.1
+librosa>=0.9.0
+
+# Configuration
+pydantic>=1.10.0
