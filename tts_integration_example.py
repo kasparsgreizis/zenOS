@@ -40,6 +40,16 @@ class Pyttsx3TTSEngine:
     """TTS engine using pyttsx3 (offline, fast)"""
     
     def __init__(self, voice_id: str = None, rate: int = 200):
+        """
+        Initialize the pyttsx3 TTS engine, optionally selecting a voice and configuring speech rate and volume.
+        
+        Parameters:
+            voice_id (str): Optional substring or identifier of the desired voice; if provided, selects the first matching voice ID.
+            rate (int): Speech rate (words per minute) to set on the engine; defaults to 200.
+        
+        Raises:
+            ImportError: If the pyttsx3 library is not available.
+        """
         if not PYTTSX3_AVAILABLE:
             raise ImportError("pyttsx3 not available. Install with: pip install pyttsx3")
         
@@ -60,7 +70,15 @@ class Pyttsx3TTSEngine:
         self.engine.setProperty('volume', 0.9)
     
     async def generate_audio(self, text: str, **kwargs) -> bytes:
-        """Generate audio using pyttsx3"""
+        """
+        Synthesize spoken audio from the given text and return it as WAV-formatted bytes.
+        
+        Parameters:
+            text (str): The text to synthesize into speech.
+        
+        Returns:
+            bytes: WAV-formatted audio data containing the synthesized speech.
+        """
         # pyttsx3 doesn't return audio data directly, so we'll use a workaround
         # In a real implementation, you might want to use a different approach
         import tempfile
@@ -81,6 +99,19 @@ class GTTS_Engine:
     """TTS engine using Google Text-to-Speech (online, high quality)"""
     
     def __init__(self, language: str = 'en', tld: str = 'com'):
+        """
+        Initialize the GTTS-based TTS engine and prepare the audio mixer for playback.
+        
+        Parameters:
+        	language (str): Language code passed to gTTS (e.g., 'en').
+        	tld (str): Top-level domain to use for gTTS host (e.g., 'com').
+        
+        Raises:
+        	ImportError: If gTTS or pygame are not available.
+        
+        Notes:
+        	This initializes pygame.mixer as part of preparing audio playback.
+        """
         if not GTTS_AVAILABLE:
             raise ImportError("gTTS not available. Install with: pip install gtts pygame")
         
@@ -89,7 +120,15 @@ class GTTS_Engine:
         pygame.mixer.init()
     
     async def generate_audio(self, text: str, **kwargs) -> bytes:
-        """Generate audio using gTTS"""
+        """
+        Convert the given text to MP3-encoded audio bytes using the engine's configured language and domain.
+        
+        Parameters:
+            text (str): Text to synthesize.
+        
+        Returns:
+            bytes: MP3-encoded audio data representing the synthesized speech.
+        """
         tts = gTTS(text=text, lang=self.language, tld=self.tld)
         
         # Save to temporary file
@@ -106,7 +145,14 @@ class GTTS_Engine:
             return audio_data
     
     async def play_audio(self, audio_data: bytes) -> None:
-        """Play audio using pygame"""
+        """
+        Play MP3 audio data through pygame and wait until playback completes.
+        
+        Parameters:
+            audio_data (bytes): Raw MP3-formatted audio bytes to be played.
+        
+        The function blocks (awaits) until playback finishes.
+        """
         import tempfile
         import os
         
@@ -128,6 +174,17 @@ class AzureTTS_Engine:
     """TTS engine using Azure Cognitive Services Speech"""
     
     def __init__(self, subscription_key: str, region: str, voice_name: str = "en-US-AriaNeural"):
+        """
+        Initialize the AzureTTS_Engine with credentials and synthesis voice configuration.
+        
+        Parameters:
+            subscription_key (str): Azure Cognitive Services Speech subscription key.
+            region (str): Azure service region associated with the subscription (e.g., "eastus").
+            voice_name (str): Synthesis voice identifier to use for speech output (default "en-US-AriaNeural").
+        
+        Raises:
+            ImportError: If the Azure Speech SDK is not installed or available.
+        """
         if not AZURE_AVAILABLE:
             raise ImportError("Azure Speech SDK not available. Install with: pip install azure-cognitiveservices-speech")
         
@@ -146,7 +203,17 @@ class AzureTTS_Engine:
         )
     
     async def generate_audio(self, text: str, **kwargs) -> bytes:
-        """Generate audio using Azure Speech Services"""
+        """
+        Synthesize the provided text with Azure Cognitive Services and return the resulting raw audio bytes.
+        
+        The audio format is the one configured on the engine's SpeechConfig (e.g., MP3). The method raises an Exception when synthesis does not complete successfully; the exception message includes the synthesis result reason.
+        
+        Returns:
+            bytes: Raw audio data produced by the synthesizer in the configured audio format.
+        
+        Raises:
+            Exception: If speech synthesis fails; message contains the failure reason.
+        """
         synthesizer = speechsdk.SpeechSynthesizer(speech_config=self.speech_config)
         
         result = synthesizer.speak_text_async(text).get()
@@ -161,6 +228,15 @@ class StreamerBotIntegration:
     """Integration class for streamer bot scenarios"""
     
     def __init__(self, tts_manager: TTSQueueManager):
+        """
+        Initialize the StreamerBotIntegration.
+        
+        Stores the given TTSQueueManager, creates a logger for the integration, and establishes a default mapping
+        from streamer event types to MessagePriority values used when queuing messages.
+        
+        Parameters:
+            tts_manager (TTSQueueManager): Manager used to enqueue and manage TTS messages.
+        """
         self.tts_manager = tts_manager
         self.logger = logging.getLogger(__name__ + ".StreamerBot")
         
@@ -177,7 +253,20 @@ class StreamerBotIntegration:
         }
     
     def process_donation(self, donor_name: str, amount: float, message: str = ""):
-        """Process a donation message"""
+        """
+        Create and enqueue a donation TTS message with priority and metadata based on the donation amount.
+        
+        Parameters:
+            donor_name (str): Donor display name to include in the announcement.
+            amount (float): Donation amount; determines priority (>=100 → urgent, >=50 → high, otherwise high).
+            message (str): Optional additional text to include in the announcement.
+        
+        Returns:
+            Identifier of the queued TTS message.
+        
+        Notes:
+            The queued message includes metadata with keys "type", "donor", "amount", and "message".
+        """
         if amount >= 100:
             priority = MessagePriority.URGENT
             text = f"WOW! {donor_name} just donated ${amount}! {message}".strip()
@@ -201,7 +290,19 @@ class StreamerBotIntegration:
         )
     
     def process_subscription(self, subscriber_name: str, months: int = 1, message: str = ""):
-        """Process a subscription message"""
+        """
+        Create and queue a subscription notification message with a priority based on subscription length.
+        
+        For subscriptions of 12 months or more the message is formatted as a VIP announcement and queued with urgent priority; shorter subscriptions are queued with high priority.
+        
+        Parameters:
+            subscriber_name (str): Display name of the subscriber.
+            months (int): Number of months the user has been subscribed; defaults to 1. Values >= 12 are treated as VIP.
+            message (str): Optional additional message text to include.
+        
+        Returns:
+            message_id: Identifier of the queued TTS message.
+        """
         if months >= 12:
             text = f"VIP subscriber {subscriber_name} has been subscribed for {months} months! {message}".strip()
             priority = MessagePriority.URGENT
@@ -222,7 +323,15 @@ class StreamerBotIntegration:
         )
     
     def process_follow(self, follower_name: str):
-        """Process a follow message"""
+        """
+        Queue a follow announcement for the TTS system.
+        
+        Parameters:
+            follower_name (str): Display name of the new follower.
+        
+        Returns:
+            message_id: The queued message ID returned by the TTS manager.
+        """
         return self.tts_manager.add_message(
             text=f"New follower {follower_name}! Thanks for following!",
             priority=MessagePriority.HIGH,
@@ -234,7 +343,17 @@ class StreamerBotIntegration:
         )
     
     def process_chat_message(self, username: str, message: str, is_mod: bool = False):
-        """Process a chat message (only if it's from a mod or contains keywords)"""
+        """
+        Queue a chat-originated TTS message when the sender is a moderator or the text contains a TTS command.
+        
+        Parameters:
+            username (str): Display name of the chat user who sent the message.
+            message (str): Raw chat message text; command keywords (e.g., `!tts`, `!say`, `!announce`) will trigger queuing.
+            is_mod (bool): True if the sender is a moderator; moderator messages are always eligible.
+        
+        Returns:
+            str | None: The queued message ID if the message was added to the TTS queue, `None` if the message was ignored.
+        """
         # Only process mod messages or messages with specific keywords
         keywords = ["!tts", "!say", "!announce"]
         should_process = is_mod or any(keyword in message.lower() for keyword in keywords)
@@ -266,13 +385,32 @@ class WebSocketServer:
     """WebSocket server for real-time message handling"""
     
     def __init__(self, streamer_bot: StreamerBotIntegration, host: str = "localhost", port: int = 8765):
+        """
+        Initialize the WebSocketServer with a StreamerBotIntegration and network binding.
+        
+        Parameters:
+            streamer_bot (StreamerBotIntegration): Integration that will handle incoming streamer events and enqueue TTS messages.
+            host (str): Hostname or IP address to bind the WebSocket server to. Defaults to "localhost".
+            port (int): TCP port to listen on. Defaults to 8765.
+        """
         self.streamer_bot = streamer_bot
         self.host = host
         self.port = port
         self.logger = logging.getLogger(__name__ + ".WebSocketServer")
     
     async def handle_message(self, websocket, path):
-        """Handle incoming WebSocket messages"""
+        """
+        Handle incoming WebSocket JSON messages and dispatch them to streamer event handlers.
+        
+        Accepts JSON objects with a "type" field and forwards events to StreamerBotIntegration, then sends a JSON response over the same WebSocket. Supported message types and required/requested fields:
+        - "donation": requires "donor_name" (str) and "amount" (number); optional "message" (str). Responds {"status":"queued","message_id": <id>}.
+        - "subscription": requires "subscriber_name" (str); optional "months" (int, defaults to 1) and "message" (str). Responds {"status":"queued","message_id": <id>}.
+        - "follow": requires "follower_name" (str). Responds {"status":"queued","message_id": <id>}.
+        - "chat": requires "username" (str) and "message" (str); optional "is_mod" (bool). Responds {"status":"queued","message_id": <id>} if the message was queued, otherwise {"status":"ignored"}.
+        - "stats": no additional fields; responds {"type":"stats","data": <stats>} where <stats> is returned from the TTS manager.
+        
+        If "type" is unrecognized, sends {"status":"error","message":"Unknown message type"}. If the payload is not valid JSON, sends {"status":"error","message":"Invalid JSON"}. On other exceptions, logs the error and sends {"status":"error","message": <error message>}.
+        """
         async for message in websocket:
             try:
                 data = json.loads(message)
@@ -325,7 +463,11 @@ class WebSocketServer:
                 await websocket.send(json.dumps({"status": "error", "message": str(e)}))
     
     async def start_server(self):
-        """Start the WebSocket server"""
+        """
+        Start the WebSocket server and accept incoming connections on the configured host and port.
+        
+        Begins serving using the instance's `handle_message` coroutine and runs indefinitely until the event loop is stopped or the server is cancelled.
+        """
         self.logger.info(f"Starting WebSocket server on {self.host}:{self.port}")
         async with websockets.serve(self.handle_message, self.host, self.port):
             await asyncio.Future()  # Run forever

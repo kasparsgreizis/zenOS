@@ -59,7 +59,15 @@ class TTSMessage:
     created_by: str = "unknown"
     
     def __lt__(self, other):
-        """Priority queue ordering (higher priority first, then by timestamp)"""
+        """
+        Define ordering for priority queue: messages with higher priority come before lower-priority messages; for equal priority, earlier timestamps come first.
+        
+        Parameters:
+            other (TTSMessage): The message to compare against.
+        
+        Returns:
+            bool: `True` if `self` should come before `other` in the queue, `False` otherwise.
+        """
         if self.priority.value != other.priority.value:
             return self.priority.value > other.priority.value
         return self.timestamp < other.timestamp
@@ -84,13 +92,27 @@ class AudioManager:
     """Manages audio playback and prevents overlaps"""
     
     def __init__(self, config: TTSConfig):
+        """
+        Initialize the AudioManager and its runtime state.
+        
+        Parameters:
+            config (TTSConfig): Configuration used to control audio scheduling and playback behavior (e.g., overlap threshold, sample rate). The object is stored for use by other AudioManager methods.
+        """
         self.config = config
         self.current_audio_end_time = 0
         self.audio_lock = threading.Lock()
         self.logger = logging.getLogger(__name__ + ".AudioManager")
     
     def can_play_audio(self, estimated_duration: float) -> bool:
-        """Check if audio can be played without overlap"""
+        """
+        Determine whether a new audio segment can start without causing unacceptable overlap.
+        
+        Parameters:
+            estimated_duration (float): Estimated duration of the audio to be played, in seconds.
+        
+        Returns:
+            bool: `True` if the audio can start immediately without exceeding the configured overlap threshold, `False` otherwise.
+        """
         with self.audio_lock:
             current_time = time.time()
             if current_time >= self.current_audio_end_time:
@@ -101,7 +123,15 @@ class AudioManager:
             return time_until_available <= self.config.audio_overlap_threshold
     
     def schedule_audio(self, estimated_duration: float) -> float:
-        """Schedule audio playback and return start time"""
+        """
+        Reserve a playback time slot to avoid overlap and return the scheduled start timestamp.
+        
+        Parameters:
+            estimated_duration (float): Duration of the audio in seconds to reserve.
+        
+        Returns:
+            float: UNIX timestamp (seconds since the epoch) representing when playback should start.
+        """
         with self.audio_lock:
             current_time = time.time()
             start_time = max(current_time, self.current_audio_end_time)
@@ -109,7 +139,12 @@ class AudioManager:
             return start_time
     
     def estimate_duration(self, text: str) -> float:
-        """Estimate audio duration based on text length"""
+        """
+        Estimate playback duration for the given text using a simple length-based heuristic.
+        
+        Returns:
+            float: Estimated duration in seconds (minimum 0.5 seconds).
+        """
         # Rough estimation: ~150 words per minute, ~2.5 characters per word
         words = len(text.split())
         duration = (words / 150) * 60  # seconds
@@ -120,13 +155,26 @@ class RateLimiter:
     """Rate limiter to prevent overwhelming the TTS system"""
     
     def __init__(self, config: TTSConfig):
+        """
+        Initialize the RateLimiter and prepare internal state for tracking recent requests.
+        
+        Parameters:
+            config (TTSConfig): Configuration that controls rate limiting behavior (e.g., `rate_limit_per_minute` and `enable_rate_limiting`).
+        """
         self.config = config
         self.requests = []
         self.lock = threading.Lock()
         self.logger = logging.getLogger(__name__ + ".RateLimiter")
     
     def can_process(self) -> bool:
-        """Check if a new request can be processed within rate limits"""
+        """
+        Determine whether a new request may be accepted under the configured per-minute rate limit.
+        
+        If rate limiting is disabled, this always allows the request. When allowed, the current timestamp is recorded for future rate calculations. If the number of requests in the last 60 seconds has reached the configured limit, the call is denied.
+        
+        Returns:
+            `True` if the request may be processed and its timestamp was recorded, `False` if the per-minute limit has been reached.
+        """
         if not self.config.enable_rate_limiting:
             return True
         
@@ -148,6 +196,16 @@ class TTSWorker:
     """Worker thread for processing TTS requests"""
     
     def __init__(self, worker_id: int, config: TTSConfig, audio_manager: AudioManager):
+        """
+        Create and initialize a TTSWorker with its identifier, configuration, and audio manager.
+        
+        Parameters:
+            worker_id (int): Numeric identifier for this worker instance.
+            config (TTSConfig): Configuration used by the worker (concurrency, audio settings, thresholds).
+            audio_manager (AudioManager): Manager responsible for audio scheduling and overlap checks.
+        
+        The constructor initializes the worker's logger, sets `is_running` to False, and sets `current_message` to None.
+        """
         self.worker_id = worker_id
         self.config = config
         self.audio_manager = audio_manager
@@ -156,7 +214,16 @@ class TTSWorker:
         self.current_message: Optional[TTSMessage] = None
     
     async def process_message(self, message: TTSMessage, tts_engine: Callable) -> bool:
-        """Process a single TTS message"""
+        """
+        Process a single TTS queue item through generation, scheduling, and playback.
+        
+        Parameters:
+            message (TTSMessage): The TTS message to process; its `status` and `retry_count` may be updated.
+            tts_engine (Callable): Async callable used to generate audio bytes for the message.
+        
+        Returns:
+            bool: `true` if the message completed playback and was marked COMPLETED, `false` if processing failed (message marked FAILED).
+        """
         try:
             self.current_message = message
             message.status = TTSStatus.PROCESSING
@@ -199,7 +266,16 @@ class TTSWorker:
             self.current_message = None
     
     async def _generate_audio(self, message: TTSMessage, tts_engine: Callable) -> bytes:
-        """Generate audio using the TTS engine"""
+        """
+        Generate audio bytes for a TTSMessage using the provided TTS engine.
+        
+        Parameters:
+            message (TTSMessage): The message to synthesize, containing text and optional metadata (e.g., voice).
+            tts_engine (Callable): A callable used to produce audio from text; expected to accept the message text (and optionally voice or metadata) and return audio data as bytes.
+        
+        Returns:
+            audio_bytes (bytes): Synthesized audio data for the given message.
+        """
         # This is a placeholder - replace with actual TTS engine call
         # For example: return await tts_engine(message.text, voice=message.metadata.get('voice', self.config.default_voice))
         
@@ -210,7 +286,15 @@ class TTSWorker:
         return b"dummy_audio_data"
     
     async def _play_audio(self, audio_data: bytes, message: TTSMessage) -> None:
-        """Play the generated audio"""
+        """
+        Play audio for a message.
+        
+        This placeholder implementation simulates playback by awaiting the estimated duration derived from the message text.
+        
+        Parameters:
+            audio_data (bytes): Raw audio bytes to be played.
+            message (TTSMessage): Message whose text is used to estimate playback duration.
+        """
         # This is a placeholder - replace with actual audio playback
         # For example: pygame.mixer.music.load(io.BytesIO(audio_data))
         
@@ -223,6 +307,14 @@ class TTSQueueManager:
     """Main TTS queue manager"""
     
     def __init__(self, config: TTSConfig = None):
+        """
+        Initialize the TTSQueueManager and its runtime components.
+        
+        Creates or uses the provided TTSConfig (defaults to a new TTSConfig()), configures logging, instantiates AudioManager and RateLimiter, creates the message queue as a PriorityQueue or Queue based on configuration, prepares the worker pool and worker list, sets initial running state and TTS engine placeholder, and initializes runtime statistics.
+        
+        Parameters:
+            config (TTSConfig, optional): Configuration for queue behavior and limits; if omitted a default TTSConfig() is used.
+        """
         self.config = config or TTSConfig()
         self.logger = logging.getLogger(__name__ + ".QueueManager")
         
@@ -260,7 +352,14 @@ class TTSQueueManager:
         )
     
     def set_tts_engine(self, tts_engine: Callable):
-        """Set the TTS engine function"""
+        """
+        Configure the callable used to generate audio for queued messages.
+        
+        The provided `tts_engine` should be a callable that accepts the message text (and optionally voice/format kwargs) and returns audio data (bytes or bytes-like). It may be a regular or async callable; workers will invoke it to produce the audio payload for playback.
+        
+        Parameters:
+            tts_engine (Callable): A function or coroutine function that takes at least one positional argument `text` (str) and returns audio bytes. Optional keyword arguments such as `voice` or `audio_format` are permitted.
+        """
         self.tts_engine = tts_engine
     
     async def start(self):
@@ -281,7 +380,11 @@ class TTSQueueManager:
         self.logger.info(f"Started {len(self.workers)} TTS workers")
     
     async def stop(self):
-        """Stop the TTS queue system"""
+        """
+        Signal the TTS queue manager to stop processing and shut down worker resources.
+        
+        Sets the running flag to False, waits briefly to allow in-flight worker tasks to complete, and shuts down the thread pool executor used for workers.
+        """
         self.is_running = False
         self.logger.info("Stopping TTS queue system")
         
@@ -290,7 +393,14 @@ class TTSQueueManager:
         self.worker_pool.shutdown(wait=True)
     
     async def _worker_loop(self, worker: TTSWorker):
-        """Main worker loop"""
+        """
+        Run the worker's asynchronous loop to fetch and process messages until the manager stops.
+        
+        Continuously retrieves messages from the manager's queue, enforces rate limiting (re-queues messages with lowered priority when throttled), dispatches messages to the provided TTSWorker for processing, and updates runtime statistics. Sleeps briefly when the queue is empty or on transient errors. Loop terminates when the manager's `is_running` flag is cleared.
+        
+        Parameters:
+            worker (TTSWorker): The worker instance that will process dequeued messages.
+        """
         while self.is_running:
             try:
                 # Get message from queue
@@ -325,7 +435,21 @@ class TTSQueueManager:
     
     def add_message(self, text: str, priority: MessagePriority = MessagePriority.NORMAL, 
                    metadata: Dict[str, Any] = None, created_by: str = "unknown") -> str:
-        """Add a message to the TTS queue"""
+        """
+                   Enqueue a new text message for TTS processing with the given priority and metadata.
+                   
+                   Parameters:
+                       text (str): The message content to synthesize.
+                       priority (MessagePriority): Priority level for queue ordering; defaults to NORMAL.
+                       metadata (Dict[str, Any]): Optional additional data attached to the message; defaults to an empty dict.
+                       created_by (str): Identifier for the message originator; defaults to "unknown".
+                   
+                   Returns:
+                       message_id (str): The unique identifier of the enqueued message.
+                   
+                   Raises:
+                       RuntimeError: If the TTS queue system is not running or if the queue is full.
+                   """
         if not self.is_running:
             raise RuntimeError("TTS queue system is not running")
         
@@ -345,7 +469,16 @@ class TTSQueueManager:
             raise RuntimeError("TTS queue is full")
     
     def get_stats(self) -> Dict[str, Any]:
-        """Get current statistics"""
+        """
+        Provide runtime statistics and current state of the TTS queue manager.
+        
+        Returns:
+            dict: Mapping with current runtime metrics:
+                - "queue_size": number of messages currently queued (int)
+                - "is_running": whether the manager is running (bool)
+                - "active_workers": number of workers currently processing a message (int)
+                - ...plus any additional metrics present in the manager's internal `stats` dictionary
+        """
         return {
             **self.stats,
             "queue_size": self.message_queue.qsize(),
@@ -365,7 +498,11 @@ class TTSQueueManager:
 
 # Example usage and configuration
 async def example_usage():
-    """Example demonstrating the TTS queue system"""
+    """
+    Run a short example that demonstrates configuring and using the TTS queue system.
+    
+    This coroutine configures a TTSQueueManager with a mock TTS engine, starts the system, enqueues several sample messages with varying priorities and metadata, allows processing to run for a short time, prints final statistics, and then stops the manager. Intended for manual demonstration or quick local testing; not for production use.
+    """
     
     # Create configuration
     config = TTSConfig(
@@ -380,6 +517,15 @@ async def example_usage():
     
     # Set up a mock TTS engine (replace with actual TTS engine)
     async def mock_tts_engine(text: str, **kwargs) -> bytes:
+        """
+        Generate mock audio data for the given text.
+        
+        Parameters:
+            text (str): The input text to synthesize. Additional keyword arguments are accepted but ignored.
+        
+        Returns:
+            bytes: Mock audio data representing synthesized speech.
+        """
         print(f"Generating TTS for: {text}")
         await asyncio.sleep(0.2)  # Simulate TTS processing
         return b"mock_audio_data"
