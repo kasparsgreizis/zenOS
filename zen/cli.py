@@ -329,5 +329,9 @@ def setup(unattended, validate_only, phase):
 cli.add_command(plugins)
 cli.add_command(receive)
 
+# Add PKM commands
+from zen.pkm.cli import pkm
+cli.add_command(pkm)
+
 if __name__ == "__main__":
     cli()

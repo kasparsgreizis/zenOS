@@ -1,0 +1,61 @@
+# PKM (Personal Knowledge Management) Configuration for zenOS
+# This file configures the PKM module for extracting and managing Google Gemini conversations
+
+# Storage Configuration
+storage:
+  pkm_dir: "~/.zenOS/pkm"
+  conversations_dir: "~/.zenOS/pkm/conversations"
+  knowledge_base_dir: "~/.zenOS/pkm/knowledge_base"
+  exports_dir: "~/.zenOS/pkm/exports"
+  storage_format: "both"  # json, markdown, or both
+  compress_old_conversations: true
+  max_storage_size_mb: 1000
+
+# Google Gemini Configuration
+gemini:
+  session_cookie: ""  # Set via GEMINI_SESSION_COOKIE environment variable
+  csrf_token: ""      # Set via GEMINI_CSRF_TOKEN environment variable
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+  base_url: "https://gemini.google.com"
+
+# Extraction Settings
+extraction:
+  max_conversations_per_run: 50
+  extraction_interval_hours: 6
+  conversation_timeout: 30
+  retry_attempts: 3
+
+# Processing Settings
+processing:
+  auto_summarize: true
+  extract_keywords: true
+  generate_tags: true
+  save_raw_html: false
+
+# Cron Job Settings
+scheduler:
+  enabled: true
+  cron_schedule: "0 */6 * * *"  # Every 6 hours
+  jobs:
+    extract_conversations:
+      schedule: "0 */6 * * *"
+      enabled: true
+      description: "Extract conversations from Google Gemini"
+    process_knowledge:
+      schedule: "0 2 * * *"
+      enabled: true
+      description: "Process conversations and extract knowledge"
+    cleanup_old_data:
+      schedule: "0 3 * * 0"
+      enabled: true
+      description: "Clean up old data files"
+
+# AI Processing (optional)
+ai_processing:
+  enabled: false
+  model: "anthropic/claude-3-haiku"
+  max_tokens: 1000
+  temperature: 0.3
+  use_for_summarization: true
+  use_for_keyword_extraction: true
+  use_for_tag_generation: true
