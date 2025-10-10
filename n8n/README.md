@@ -78,7 +78,14 @@ Connect additional nodes to:
 4. **Respond with UI**: Returns the complete web application
 
 ### Dependencies
-- `js-yaml`: For parsing YAML templates (included in n8n)
+- **`js-yaml`**: Required for parsing YAML templates (NOT included by default in n8n)
+  - **Option 1 (Recommended)**: Configure n8n External Modules:
+    - Set environment variables:
+      - `NODE_FUNCTION_ALLOW_EXTERNAL=js-yaml`
+      - `NODE_FUNCTION_EXTERNAL_MODULES=/home/node/.n8n/node_modules`
+    - Install js-yaml: `npm install js-yaml` in the external modules directory
+    - Restart n8n
+  - **Option 2**: Parse YAML client-side in the browser (requires workflow modification)
 - Modern browser with Clipboard API support
 - HTTPS for secure clipboard access (falls back gracefully)
 
@@ -86,8 +93,9 @@ Connect additional nodes to:
 - Uses HTTPS for GitHub API calls
 - No sensitive data stored in workflow
 - Clipboard access respects browser security policies
-- CORS headers properly configured
-- No external dependencies beyond GitHub
+- CORS headers configured for open access (`Access-Control-Allow-Origin: *`)
+- HTML content is properly escaped to prevent XSS attacks
+- No external dependencies beyond GitHub and js-yaml
 
 ## 📱 Mobile Support
 
@@ -95,9 +103,10 @@ The interface is fully responsive and works seamlessly on:
 - Desktop browsers (Chrome, Firefox, Safari, Edge)
 - Mobile Safari (iOS)  
 - Chrome Mobile (Android)
-- Progressive Web App ready
 - Touch-friendly interface
 - Responsive typography and spacing
+
+**Note**: PWA features (offline support, app manifest, service workers) are not currently implemented. The interface works great as a web app but requires an active connection.
 
 ## 🚀 Advanced Features
 
@@ -128,9 +137,11 @@ Extend the workflow to:
 
 - **Load Time**: ~200ms (depends on GitHub API)
 - **Template Updates**: Real-time via GitHub raw API
-- **Browser Compatibility**: IE11+ (with fallbacks)
-- **Mobile Performance**: Optimized for 3G networks
-- **Caching**: Configurable via workflow settings
+- **Browser Compatibility**: Modern evergreen browsers (Chrome, Firefox, Safari, Edge)
+  - Uses ES2017+ features (async/await, template literals, arrow functions)
+  - **Not compatible with IE11** - use modern browsers only
+- **Mobile Performance**: Optimized for modern mobile browsers on 3G+ networks
+- **Caching**: Disabled by default for fresh templates; configurable via workflow settings
 
 ## 🛍️ Troubleshooting
 
